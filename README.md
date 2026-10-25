@@ -13,7 +13,6 @@
 ### 1. Install Dependencies
 
 ```bash
-cd ~/Code/margin-reader   # (or /Users/momchilgeorgiev/margin-reader)
 npm install
 ```
 
