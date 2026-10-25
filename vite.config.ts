@@ -21,6 +21,7 @@ const LOCAL_BOLTON_PATHS = [
 ];
 
 export default defineConfig({
+  base: process.env.GITHUB_PAGES === 'true' ? '/margin/' : './',
   plugins: [
     react(),
     {
