@@ -1,0 +1,26 @@
+#Node
+node_modules/
+# Build artifacts
+dist/
+.vite/
+*.tsbuildinfo
+
+#Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.sqlite
+*.sqlite3
+
+#Books & Local Data (Copyright Rule: Never commit copyrighted books)
+sources/
+*.pdf
+*.epub
+*.xtc
+!fixtures/**/*.pdf
+
+#Env
+.env
+.env.local
+.DS_Store
