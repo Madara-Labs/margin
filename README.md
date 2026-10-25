@@ -59,10 +59,6 @@ npm run test:all
 1. **Ingestion Parser (`tests/margin.test.ts` & `tests/python/test_sidecar.py`):** Verifies TOC, section boundary, LaTeX equation, table, and worked-example extraction on the CC-BY OpenStax *Principles of Economics* fixture.
 2. **Explorable Model Verification (`src/lib/labVerifier.ts`):**
    - Evaluates formulas safely via `math.js` (never `eval`).
-   - Verifies the Bolton §4.2 Linear-CARA Moral Hazard Lab against the analytical benchmark for $c = 1, \eta = 2, \sigma = 0.5, \bar{w} = 0$:
-     - Optimal piece rate $s^* = \frac{1}{1 + \eta c \sigma^2} = \frac{2}{3} \approx 0.6667$
-     - Second-best principal profit $\Pi^{SB} = \frac{1}{2c(1 + \eta c \sigma^2)} = \frac{1}{3} \approx 0.3333$
-     - First-best principal profit $\Pi^{FB} = \frac{1}{2c} = 0.5000$
    - Runs an independent 2,000-point numerical grid optimization certificate check.
    - Confirms that a deliberately wrong formula fails verification and blocks the lab UI with `"Couldn't verify this model"` and the exact error reason.
 3. **Spaced Revisit Scheduler (`src/lib/revisitScheduler.ts`):** Verifies the `1, 3, 7, 21` day progression and cross-chapter section interleaving.
