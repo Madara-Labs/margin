@@ -42,12 +42,7 @@ npm run sidecar   # Python FastAPI + SQLite sidecar on http://127.0.0.1:8765
 
 ---
 
-## How to Ingest & Open a Book
-
-1. **Pre-configured Books:**
-   - **Bolton & Dewatripont (2005), *Contract Theory* — Chapter 4 (§4.1–§4.3, with full end-to-end instruments on §4.2):** When your local Bolton PDF is present on your machine (e.g. in `~/Calibre Library/...` or `~/Downloads/`), clicking **📄 PDF.js Page View** in the top bar streams it directly from your local disk into PDF.js with page sync and selectable text layers—without ever copying copyrighted files into the git repository.
-   - **OpenStax *Principles of Economics 3e* (CC-BY 4.0) — Chapter 8 (§8.2):** Bundled as an openly licensed fixture (`fixtures/openstax_economics_ch8.md`) for automated parser testing and interactive exploration.
-2. **Ingesting Any Local PDF:**
+## Ingesting Any Local PDF:
    - Click **`Open PDF…`** in the top reader bar to select any PDF on your computer, or POST to `POST /api/ingest-pdf` on the local sidecar.
    - The ingestion pipeline extracts the Table of Contents, section boundaries, paragraphs, LaTeX equations (`EquationItem`), tables (`TableItem`), and worked numeric examples (`WorkedExampleItem`), storing per-book state in `localStorage` and `sidecar/margin_store.sqlite3`.
 
@@ -56,9 +51,6 @@ npm run sidecar   # Python FastAPI + SQLite sidecar on http://127.0.0.1:8765
 ## Running the Bolton §4.2 Demo Walkthrough & Tests
 
 ```bash
-# Run the interactive CLI walkthrough for Bolton Ch. 4, §4.2:
-npm run demo:bolton
-
 # Run both TypeScript (Vitest) and Python (pytest) test suites:
 npm run test:all
 ```
