@@ -2,6 +2,8 @@
 node_modules/
 # Build artifacts
 dist/
+release/
+dist-electron/
 .vite/
 *.tsbuildinfo
 

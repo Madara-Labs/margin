@@ -1,13 +1,22 @@
 {
   "name": "margin-reader",
+  "description": "A reader-first study tool that makes the human do the learning",
+  "author": "Madara Labs",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "sidecar": "python3 sidecar/main.py",
     "start": "concurrently \"npm run sidecar\" \"npm run dev\"",
     "build": "tsc -b && vite build",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "electron:pack:mac": "npm run build && electron-builder --mac",
+    "electron:pack:win": "npm run build && electron-builder --win",
+    "electron:pack:linux": "npm run build && electron-builder --linux",
+    "electron:pack:all": "npm run build && electron-builder -mwl",
     "test": "vitest run",
     "test:py": "PYTHONPATH=. pytest tests/python",
     "test:all": "vitest run && PYTHONPATH=. pytest tests/python",
@@ -29,10 +38,46 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "concurrently": "^9.1.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
     "jsdom": "^25.0.1",
     "tsx": "^4.19.2",
     "typescript": "~5.6.2",
     "vite": "^5.4.10",
-    "vitest": "^2.1.5"
+    "vitest": "^2.1.5",
+    "wait-on": "^9.5.1"
+  },
+  "build": {
+    "appId": "com.madaralabs.margin",
+    "productName": "Margin",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "sidecar/**/*",
+      "fixtures/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Education"
+    }
   }
 }

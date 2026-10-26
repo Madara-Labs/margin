@@ -16,20 +16,30 @@
 npm install
 ```
 
-### 2. Configure the Anthropic API Key (Optional for Cached Sections)
+### 2. Configure the LLM API Key (Google Gemini or Anthropic Claude)
 
-Margin uses the Anthropic Messages API with a current Claude model (`claude-sonnet-4-20250514` by default, configurable via `MARGIN_CLAUDE_MODEL`). Set your API key in the environment before starting the sidecar:
+Margin supports both **Google Gemini** (recommended for fast, cost-effective inference with a generous free tier) and **Anthropic Claude**.
+
+#### Option A: In the App UI (Easiest)
+Open the app, click **Settings (⚙)** in the reader bar, go to **AI Inference & API Keys**, and paste your Gemini API key (get one free at [Google AI Studio](https://aistudio.google.com/app/apikey)). Your key is saved locally in your browser and used securely.
+
+#### Option B: Environment Variables
+Set your key before starting the sidecar:
 
 ```bash
+# For Google Gemini (default: gemini-2.5-flash, configurable via MARGIN_GEMINI_MODEL):
+export GEMINI_API_KEY="AIzaSy..."
+
+# Or for Anthropic Claude (default: claude-sonnet-4-20250514, configurable via MARGIN_CLAUDE_MODEL):
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
 - **Privacy & Security Rules:**
-  - `ANTHROPIC_API_KEY` is read exclusively from `os.environ` in `sidecar/main.py` and is **never logged or written to disk**.
-  - Only the active section excerpt (capped to the section text) is sent to the LLM—never the whole book at once.
+  - API keys are read from environment variables or browser storage and are **never logged or written to book files**.
+  - Only the active section excerpt (capped to 12,000 characters) is sent to the LLM—never the whole book at once.
   - Every prompt sent to the LLM is recorded in SQLite and visible in the **"What the AI Was Asked"** transparency drawer in the top bar.
 
-### 3. Start the App (Frontend + Local Python Sidecar)
+### 3. Start the App (Web App Mode)
 
 ```bash
 # Run both the Vite frontend (http://localhost:5173) and FastAPI/SQLite sidecar (http://127.0.0.1:8765):
@@ -38,6 +48,24 @@ npm start
 # Or run them separately:
 npm run dev       # Vite React/TS reader UI on http://localhost:5173
 npm run sidecar   # Python FastAPI + SQLite sidecar on http://127.0.0.1:8765
+```
+
+### 4. Running & Packaging as a Desktop App (Mac, Linux & Windows)
+
+Margin can be run and packaged as a standalone native desktop application using Electron:
+
+```bash
+# Run the desktop app in development:
+npm run electron:dev
+
+# Package a standalone desktop bundle for your current OS:
+npm run electron:build
+
+# Or build platform-specific packages (outputs to release/):
+npm run electron:pack:mac     # macOS (.dmg and .zip)
+npm run electron:pack:win     # Windows installer (.exe / NSIS and .zip)
+npm run electron:pack:linux   # Linux (.AppImage and .deb)
+npm run electron:pack:all     # All platforms
 ```
 
 ---

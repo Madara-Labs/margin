@@ -40,6 +40,8 @@ LOCAL_BOLTON_PATHS = [
 
 # Current Claude model (Anthropic API)
 CLAUDE_MODEL = os.environ.get("MARGIN_CLAUDE_MODEL", "claude-sonnet-4-20250514")
+# Current Gemini model (Google Gemini API)
+GEMINI_MODEL = os.environ.get("MARGIN_GEMINI_MODEL", "gemini-2.5-flash")
 
 app = FastAPI(title="Margin Local Sidecar", version="0.1.0")
 app.add_middleware(
@@ -293,17 +295,23 @@ class LlmInstrumentRequest(BaseModel):
     method: str
     sectionExcerpt: str
     readerInput: Optional[str] = None
+    apiKey: Optional[str] = None
+    provider: Optional[str] = None  # "gemini" | "anthropic"
+    model: Optional[str] = None
 
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    has_gemini = bool(os.environ.get("GEMINI_API_KEY"))
     bolton_pdf = next((p for p in LOCAL_BOLTON_PATHS if p.exists() and p.stat().st_size > 1_000_000), None)
     return {
         "status": "ok",
         "sqlitePath": str(DB_PATH),
         "claudeModel": CLAUDE_MODEL,
-        "anthropicKeyConfigured": has_key,
+        "geminiModel": GEMINI_MODEL,
+        "anthropicKeyConfigured": has_anthropic,
+        "geminiKeyConfigured": has_gemini,
         "localBoltonPdfDetected": bool(bolton_pdf),
         "localBoltonPdfName": bolton_pdf.name if bolton_pdf else None,
     }
@@ -368,11 +376,10 @@ async def ingest_uploaded_pdf(file: UploadFile = File(...)) -> dict[str, Any]:
 @app.post("/api/llm/instrument")
 def generate_section_instrument(req: LlmInstrumentRequest) -> dict[str, Any]:
     """
-    Sends ONLY the single section excerpt (never the whole book) to Anthropic Claude.
-    Reads ANTHROPIC_API_KEY from env and never logs the key.
+    Sends ONLY the single section excerpt (never the whole book) to Google Gemini or Anthropic Claude.
+    Reads GEMINI_API_KEY / ANTHROPIC_API_KEY from env or request payload, and never logs the key.
     Logs the exact system and user prompts to SQLite so they appear in 'What the AI was asked'.
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
     excerpt = req.sectionExcerpt[:12000]  # Strict per-section cap
     system_prompt = (
         "You are the instrument builder for Margin, a reader-first study tool. "
@@ -388,62 +395,121 @@ def generate_section_instrument(req: LlmInstrumentRequest) -> dict[str, Any]:
     log_id = f"plog-{int(time.time() * 1000)}"
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    if not api_key:
+    # Determine provider and key
+    gemini_key = req.apiKey if (req.provider == "gemini" and req.apiKey) else (
+        os.environ.get("GEMINI_API_KEY") or (req.apiKey if req.apiKey and req.apiKey.startswith("AIza") else None)
+    )
+    anthropic_key = req.apiKey if (req.provider == "anthropic" and req.apiKey) else (
+        os.environ.get("ANTHROPIC_API_KEY") or (req.apiKey if req.apiKey and req.apiKey.startswith("sk-ant") else None)
+    )
+
+    provider = req.provider
+    if not provider:
+        if gemini_key:
+            provider = "gemini"
+        elif anthropic_key:
+            provider = "anthropic"
+        else:
+            provider = "gemini"
+
+    active_model = req.model or (GEMINI_MODEL if provider == "gemini" else CLAUDE_MODEL)
+    active_key = gemini_key if provider == "gemini" else anthropic_key
+
+    if not active_key:
         conn = get_db()
         conn.execute(
             "INSERT INTO prompt_logs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (log_id, req.bookId, req.sectionId, req.method, CLAUDE_MODEL, system_prompt, user_prompt, len(excerpt), "cached_local", now),
+            (log_id, req.bookId, req.sectionId, req.method, active_model, system_prompt, user_prompt, len(excerpt), "cached_local", now),
         )
         conn.commit()
         conn.close()
         return {
             "id": log_id,
             "status": "cached_local",
-            "model": CLAUDE_MODEL,
+            "model": active_model,
+            "provider": provider,
             "systemPrompt": system_prompt,
             "userPrompt": user_prompt,
             "sectionExcerptCharCount": len(excerpt),
-            "message": "ANTHROPIC_API_KEY not set in env; using verified cached section instrument.",
+            "message": "Neither GEMINI_API_KEY nor ANTHROPIC_API_KEY is configured; using verified cached section instrument.",
         }
 
-    # Call Anthropic Messages API over HTTPS without logging api_key
-    body = json.dumps({
-        "model": CLAUDE_MODEL,
-        "max_tokens": 1024,
-        "system": system_prompt,
-        "messages": [{"role": "user", "content": user_prompt}],
-    }).encode("utf-8")
+    status = "error"
+    text_out = ""
 
-    http_req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=body,
-        headers={
-            "content-type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(http_req, timeout=20) as resp:
-            resp_data = json.loads(resp.read().decode("utf-8"))
-            text_out = resp_data.get("content", [{}])[0].get("text", "")
-            status = "completed"
-    except Exception as exc:
-        text_out = f"Anthropic API call fallback ({type(exc).__name__}); using cached anchor."
-        status = "error"
+    if provider == "gemini":
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent?key={active_key}"
+        body = json.dumps({
+            "system_instruction": {
+                "parts": [{"text": system_prompt}]
+            },
+            "contents": [
+                {"parts": [{"text": user_prompt}]}
+            ],
+            "generationConfig": {
+                "maxOutputTokens": 1024,
+                "temperature": 0.2
+            }
+        }).encode("utf-8")
+
+        http_req = urllib.request.Request(
+            gemini_url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(http_req, timeout=20) as resp:
+                resp_data = json.loads(resp.read().decode("utf-8"))
+                candidates = resp_data.get("candidates", [])
+                if candidates and "content" in candidates[0]:
+                    parts = candidates[0]["content"].get("parts", [])
+                    text_out = "".join(p.get("text", "") for p in parts)
+                status = "completed"
+        except Exception as exc:
+            text_out = f"Gemini API call fallback ({type(exc).__name__}); using cached anchor."
+            status = "error"
+
+    else:
+        # Call Anthropic Messages API over HTTPS without logging api_key
+        body = json.dumps({
+            "model": active_model,
+            "max_tokens": 1024,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_prompt}],
+        }).encode("utf-8")
+
+        http_req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body,
+            headers={
+                "content-type": "application/json",
+                "x-api-key": active_key,
+                "anthropic-version": "2023-06-01",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(http_req, timeout=20) as resp:
+                resp_data = json.loads(resp.read().decode("utf-8"))
+                text_out = resp_data.get("content", [{}])[0].get("text", "")
+                status = "completed"
+        except Exception as exc:
+            text_out = f"Anthropic API call fallback ({type(exc).__name__}); using cached anchor."
+            status = "error"
 
     conn = get_db()
     conn.execute(
         "INSERT INTO prompt_logs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (log_id, req.bookId, req.sectionId, req.method, CLAUDE_MODEL, system_prompt, user_prompt, len(excerpt), status, now),
+        (log_id, req.bookId, req.sectionId, req.method, active_model, system_prompt, user_prompt, len(excerpt), status, now),
     )
     conn.commit()
     conn.close()
     return {
         "id": log_id,
         "status": status,
-        "model": CLAUDE_MODEL,
+        "model": active_model,
+        "provider": provider,
         "systemPrompt": system_prompt,
         "userPrompt": user_prompt,
         "sectionExcerptCharCount": len(excerpt),

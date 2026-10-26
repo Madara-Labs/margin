@@ -1,7 +1,12 @@
+import io
+import json
 from pathlib import Path
-from sidecar.main import extract_markdown_structure
+from unittest.mock import MagicMock, patch
+from fastapi.testclient import TestClient
+from sidecar.main import app, extract_markdown_structure
 
 FIXTURE = Path(__file__).resolve().parent.parent.parent / "fixtures" / "openstax_economics_ch8.md"
+client = TestClient(app)
 
 
 def test_python_ingestion_parser_on_openstax_fixture():
@@ -48,4 +53,66 @@ def test_python_parser_multiline_heading_and_running_header():
     assert sec11["paragraphs"][1]["text"] == "Both individuals could decide not to trade."
     assert "5 Introduction" not in sec11["paragraphs"][1]["text"]
     assert sec11["paragraphs"][1]["page"] == 5
+
+
+def test_health_endpoint_reports_gemini_config():
+    resp = client.get("/api/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "geminiModel" in data
+    assert "geminiKeyConfigured" in data
+    assert "claudeModel" in data
+    assert "anthropicKeyConfigured" in data
+    assert data["geminiModel"] == "gemini-2.5-flash"
+
+
+def test_llm_instrument_gemini_without_key_falls_back():
+    resp = client.post("/api/llm/instrument", json={
+        "bookId": "bolton-test",
+        "sectionId": "1.1",
+        "method": "free_recall_check",
+        "sectionExcerpt": "Sample excerpt text.",
+        "provider": "gemini",
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "cached_local"
+    assert data["provider"] == "gemini"
+    assert "gemini" in data["model"].lower()
+    assert "Neither GEMINI_API_KEY nor ANTHROPIC_API_KEY" in data["message"]
+
+
+def test_llm_instrument_gemini_with_mocked_api_call():
+    mock_response = MagicMock()
+    mock_payload = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [{"text": '{"coverage": "covered", "explanation": "Accurate recall"}'}]
+                }
+            }
+        ]
+    }
+    mock_response.read.return_value = json.dumps(mock_payload).encode("utf-8")
+    mock_response.__enter__.return_value = mock_response
+
+    with patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+        resp = client.post("/api/llm/instrument", json={
+            "bookId": "bolton-test",
+            "sectionId": "1.1",
+            "method": "free_recall_check",
+            "sectionExcerpt": "Sample excerpt text.",
+            "provider": "gemini",
+            "apiKey": "AIzaSyFakeGeminiKey12345",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "completed"
+        assert data["provider"] == "gemini"
+        assert '{"coverage": "covered"' in data["responseText"]
+        assert mock_urlopen.called
+        req_arg = mock_urlopen.call_args[0][0]
+        assert "generativelanguage.googleapis.com" in req_arg.full_url
+        assert "key=AIzaSyFakeGeminiKey12345" in req_arg.full_url
+
 

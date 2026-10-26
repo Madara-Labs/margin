@@ -317,3 +317,60 @@ describe('4. Section Pre-Questions & Ingestion Guarantees', () => {
     expect(BOLTON_1_1_PRE_QUESTIONS.every((pq) => pq.sectionId === '1.1')).toBe(true);
   });
 });
+
+describe('5. AI Client & Gemini API Key Management', () => {
+  it('stores and retrieves Gemini API key and AI provider in localStorage', async () => {
+    const { getStoredGeminiKey, setStoredGeminiKey, getStoredProvider, setStoredProvider } = await import('../src/lib/aiClient');
+    setStoredGeminiKey('AIzaSyTestKey123456');
+    expect(getStoredGeminiKey()).toBe('AIzaSyTestKey123456');
+
+    setStoredProvider('gemini');
+    expect(getStoredProvider()).toBe('gemini');
+
+    setStoredProvider('anthropic');
+    expect(getStoredProvider()).toBe('anthropic');
+
+    setStoredGeminiKey('');
+    expect(getStoredGeminiKey()).toBe('');
+  });
+
+  it('generates cached local instrument when no keys are configured', async () => {
+    const { generateInstrument } = await import('../src/lib/aiClient');
+    const resp = await generateInstrument({
+      bookId: 'bolton-2005',
+      sectionId: '4.2',
+      method: 'free_recall_check',
+      sectionExcerpt: 'Section excerpt content',
+      provider: 'gemini',
+    });
+    expect(resp.status).toBe('cached_local');
+    expect(resp.provider).toBe('gemini');
+    expect(resp.model).toContain('gemini');
+  });
+});
+
+describe('6. Desktop Application Packaging Configuration', () => {
+  it('has valid Electron packaging and main entry point configuration', () => {
+    const pkgPath = path.resolve(__dirname, '../package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+
+    expect(pkg.main).toBe('electron/main.cjs');
+    expect(pkg.scripts['electron:dev']).toBeDefined();
+    expect(pkg.scripts['electron:build']).toBeDefined();
+    expect(pkg.scripts['electron:pack:mac']).toBeDefined();
+    expect(pkg.scripts['electron:pack:win']).toBeDefined();
+    expect(pkg.scripts['electron:pack:linux']).toBeDefined();
+
+    expect(pkg.build).toBeDefined();
+    expect(pkg.build.appId).toBe('com.madaralabs.margin');
+    expect(pkg.build.mac.target).toContain('dmg');
+    expect(pkg.build.win.target).toContain('nsis');
+    expect(pkg.build.linux.target).toContain('AppImage');
+
+    const mainFile = path.resolve(__dirname, '../electron/main.cjs');
+    expect(fs.existsSync(mainFile)).toBe(true);
+
+    const preloadFile = path.resolve(__dirname, '../electron/preload.cjs');
+    expect(fs.existsSync(preloadFile)).toBe(true);
+  });
+});

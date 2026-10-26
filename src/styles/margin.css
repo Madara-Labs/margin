@@ -1829,8 +1829,66 @@ body {
   color: var(--text-primary);
 }
 
-.settings-scope-option span {
+.settings-scope-option span,
+.settings-scope-option small {
   font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.settings-api-key-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.settings-key-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.settings-key-help-link {
+  font-size: 11px;
+  color: var(--accent-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.settings-key-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-key-input {
+  flex: 1;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.settings-key-save-btn {
+  background: var(--accent-primary);
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 500;
+}
+
+.settings-key-status {
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.status-badge-ok {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.status-badge-info {
   color: var(--text-secondary);
 }
 

@@ -64,6 +64,13 @@ import {
 } from './lib/pdfClientIngest';
 import { PdfCanvasViewer, PdfRegionCrop } from './components/PdfCanvasViewer';
 import { ShowcaseModal } from './components/ShowcaseModal';
+import {
+  AiProvider,
+  getStoredGeminiKey,
+  getStoredProvider,
+  setStoredGeminiKey,
+  setStoredProvider,
+} from './lib/aiClient';
 
 /**
  * Renders paragraph text with inline <mark> highlights for any reader highlights
@@ -255,6 +262,38 @@ export const App: React.FC = () => {
       // ignore
     }
   }, []);
+
+  // AI Inference & Gemini API Key state
+  const [aiProvider, setAiProviderState] = useState<AiProvider>(() => getStoredProvider());
+  const [geminiApiKey, setGeminiApiKeyState] = useState<string>(() => getStoredGeminiKey());
+  const [geminiKeyDraft, setGeminiKeyDraft] = useState<string>(() => getStoredGeminiKey());
+  const [showKeySecret, setShowKeySecret] = useState<boolean>(false);
+  const [sidecarHealth, setSidecarHealth] = useState<{
+    geminiKeyConfigured?: boolean;
+    anthropicKeyConfigured?: boolean;
+    geminiModel?: string;
+    claudeModel?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((data) => setSidecarHealth(data))
+      .catch(() => setSidecarHealth(null));
+  }, []);
+
+  const handleSaveGeminiKey = (newKey: string) => {
+    setStoredGeminiKey(newKey);
+    setGeminiApiKeyState(newKey.trim());
+    setGeminiKeyDraft(newKey.trim());
+    showQuickToast(newKey.trim() ? '✓ Gemini API key saved!' : 'Gemini API key cleared.');
+  };
+
+  const handleSelectProvider = (prov: AiProvider) => {
+    setStoredProvider(prov);
+    setAiProviderState(prov);
+    showQuickToast(`AI Provider switched to ${prov === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'}`);
+  };
 
   // Active Margin Note Composer
   const [activeNoteParaId, setActiveNoteParaId] = useState<string | null>(null);
@@ -860,12 +899,17 @@ export const App: React.FC = () => {
           )
         : [...prev.revisitQueue, updatedRev];
 
+      const activeModel =
+        aiProvider === 'gemini'
+          ? (sidecarHealth?.geminiModel || 'gemini-2.5-flash')
+          : (sidecarHealth?.claudeModel || 'claude-sonnet-4-20250514');
+
       const logEntry: PromptLogEntry = {
         id: `plog-${Date.now()}`,
         timestamp: new Date().toISOString(),
         method: 'free_recall_check',
         sectionId: currentSection.id,
-        model: 'claude-sonnet-4-20250514',
+        model: activeModel,
         systemPrompt:
           'Compare the reader’s free-recall attempt against the section’s anchored key ideas. Mark coverage (covered / partial / gap) without grading prose.',
         userPrompt: `Section §${currentSection.id} | Reader recall (${attempt.readerText.length} chars): "${attempt.readerText.slice(0, 180)}..."`,
@@ -1320,6 +1364,108 @@ export const App: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Section 5: AI & LLM Inference Settings */}
+              <div className="settings-card">
+                <div className="settings-card-header">
+                  <span className="settings-card-icon">⚡</span>
+                  <div>
+                    <h3>AI Inference & API Keys</h3>
+                    <p>Configure Google Gemini for fast, cheaper cognitive instruments.</p>
+                  </div>
+                </div>
+
+                <div className="settings-scope-grid" style={{ marginBottom: '8px' }}>
+                  <button
+                    type="button"
+                    className={`settings-scope-option ${aiProvider === 'gemini' ? 'selected' : ''}`}
+                    onClick={() => handleSelectProvider('gemini')}
+                  >
+                    <strong>Google Gemini (Recommended)</strong>
+                    <small>High speed & affordable / free tier ({sidecarHealth?.geminiModel || 'gemini-2.5-flash'})</small>
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-scope-option ${aiProvider === 'anthropic' ? 'selected' : ''}`}
+                    onClick={() => handleSelectProvider('anthropic')}
+                  >
+                    <strong>Anthropic Claude</strong>
+                    <small>Messages API ({sidecarHealth?.claudeModel || 'claude-sonnet-4-20250514'})</small>
+                  </button>
+                </div>
+
+                {aiProvider === 'gemini' ? (
+                  <div className="settings-api-key-box">
+                    <label className="settings-key-label" htmlFor="gemini-key-input">
+                      <span>Gemini API Key:</span>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="settings-key-help-link"
+                      >
+                        Get key at Google AI Studio ↗
+                      </a>
+                    </label>
+                    <div className="settings-key-input-row">
+                      <input
+                        id="gemini-key-input"
+                        type={showKeySecret ? 'text' : 'password'}
+                        className="reader-search-input settings-key-input"
+                        placeholder={sidecarHealth?.geminiKeyConfigured ? 'Using sidecar GEMINI_API_KEY (or enter custom key)' : 'Paste AIzaSy... API key'}
+                        value={geminiKeyDraft}
+                        onChange={(e) => setGeminiKeyDraft(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="btn-quiet"
+                        title={showKeySecret ? 'Hide Key' : 'Show Key'}
+                        onClick={() => setShowKeySecret((s) => !s)}
+                      >
+                        {showKeySecret ? '🙈' : '👁'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-quiet settings-key-save-btn"
+                        onClick={() => handleSaveGeminiKey(geminiKeyDraft)}
+                      >
+                        Save
+                      </button>
+                      {geminiApiKey && (
+                        <button
+                          type="button"
+                          className="btn-quiet"
+                          title="Remove custom key"
+                          onClick={() => handleSaveGeminiKey('')}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="settings-key-status">
+                      {geminiApiKey ? (
+                        <span className="status-badge-ok">✓ Custom Gemini key active ({geminiApiKey.slice(0, 7)}…{geminiApiKey.slice(-4)})</span>
+                      ) : sidecarHealth?.geminiKeyConfigured ? (
+                        <span className="status-badge-ok">✓ Sidecar GEMINI_API_KEY detected from environment</span>
+                      ) : (
+                        <span className="status-badge-info">ℹ No key set. Verified cached section instruments are used offline.</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="settings-api-key-box">
+                    <div className="settings-key-status">
+                      {sidecarHealth?.anthropicKeyConfigured ? (
+                        <span className="status-badge-ok">✓ Sidecar ANTHROPIC_API_KEY detected from environment</span>
+                      ) : (
+                        <span className="status-badge-info">
+                          ℹ Set <code>ANTHROPIC_API_KEY</code> in your environment before running the sidecar, or switch to Gemini.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </aside>
         </div>
@@ -1363,17 +1509,29 @@ export const App: React.FC = () => {
             <div>
               <strong>What the AI Was Asked — Prompt Transparency Log</strong>
               <p>
-                Only the current section excerpt is ever sent to Claude (never the whole book).
-                API key is read from <code>ANTHROPIC_API_KEY</code> in the sidecar and never logged.
+                Only the current section excerpt is ever sent to Google Gemini or Claude (never the whole book).
+                API keys are configured in Settings or sidecar environment (<code>GEMINI_API_KEY</code> / <code>ANTHROPIC_API_KEY</code>) and are never logged.
               </p>
             </div>
-            <button
-              type="button"
-              className="btn-quiet"
-              onClick={() => setShowPromptPanel(false)}
-            >
-              Close ×
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn-quiet"
+                onClick={() => {
+                  setShowPromptPanel(false);
+                  setShowOptionsMenu(true);
+                }}
+              >
+                ⚙ AI Settings
+              </button>
+              <button
+                type="button"
+                className="btn-quiet"
+                onClick={() => setShowPromptPanel(false)}
+              >
+                Close ×
+              </button>
+            </div>
           </div>
           <div className="prompt-log-list">
             {store.promptLogs.map((log) => (
