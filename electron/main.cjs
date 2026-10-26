@@ -69,6 +69,7 @@ function stopPythonSidecar() {
 }
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '../build/icon.png');
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -76,6 +77,7 @@ function createWindow() {
     minHeight: 640,
     title: 'Margin — Reader-First Study Instrument',
     backgroundColor: '#fbfaf8',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

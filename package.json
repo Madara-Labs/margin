@@ -60,7 +60,8 @@
       "dist/**/*",
       "electron/**/*",
       "sidecar/**/*",
-      "fixtures/**/*"
+      "fixtures/**/*",
+      "build/**/*"
     ],
     "asarUnpack": [
       "sidecar/**/*",
