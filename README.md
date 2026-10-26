@@ -68,6 +68,16 @@ npm run electron:pack:linux   # Linux (.AppImage and .deb)
 npm run electron:pack:all     # All platforms
 ```
 
+> **Note on macOS Gatekeeper:**
+> If you build or download Margin without an Apple Developer ID certificate, macOS attaches a quarantine flag to downloaded files. To open Margin if macOS prompts that it is from an unidentified developer:
+> - Either right-click (or Control-click) `Margin.app` and choose **Open**, then confirm **Open**;
+> - Or remove the quarantine attribute via Terminal:
+>   ```bash
+>   xattr -cr /Applications/Margin.app
+>   # or if running from Downloads:
+>   xattr -cr ~/Downloads/Margin.app
+>   ```
+
 ---
 
 ## Ingesting Any Local PDF:

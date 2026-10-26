@@ -8,8 +8,16 @@ let sidecarProcess = null;
 
 const isDev = process.env.NODE_ENV === 'development' || Boolean(process.env.VITE_DEV_SERVER_URL);
 
+function getAppRoot() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'app.asar.unpacked');
+  }
+  return path.join(__dirname, '..');
+}
+
 function startPythonSidecar() {
-  const sidecarScript = path.join(__dirname, '../sidecar/main.py');
+  const rootDir = getAppRoot();
+  const sidecarScript = path.join(rootDir, 'sidecar/main.py');
   if (!fs.existsSync(sidecarScript)) {
     console.log('[Electron] Sidecar script not found, running in client-only mode.');
     return;
@@ -18,9 +26,9 @@ function startPythonSidecar() {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   try {
     sidecarProcess = spawn(pythonCmd, [sidecarScript], {
-      cwd: path.join(__dirname, '..'),
+      cwd: rootDir,
       stdio: 'pipe',
-      env: { ...process.env, PYTHONPATH: path.join(__dirname, '..') },
+      env: { ...process.env, PYTHONPATH: rootDir },
     });
 
     sidecarProcess.stdout.on('data', (data) => {

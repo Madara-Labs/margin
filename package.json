@@ -62,8 +62,15 @@
       "sidecar/**/*",
       "fixtures/**/*"
     ],
+    "asarUnpack": [
+      "sidecar/**/*",
+      "fixtures/**/*"
+    ],
     "mac": {
       "category": "public.app-category.education",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
       "target": [
         "dmg",
         "zip"
