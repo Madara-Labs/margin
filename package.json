@@ -1,7 +1,10 @@
 {
   "name": "margin-reader",
   "description": "A reader-first study tool that makes the human do the learning",
-  "author": "Madara Labs",
+  "author": {
+    "name": "Madara Labs",
+    "email": "contact@madaralabs.com"
+  },
   "private": true,
   "version": "0.1.0",
   "type": "module",
